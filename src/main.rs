@@ -49,7 +49,7 @@ fn main() -> io::Result<()> {
     })?;
     // タイプセットが行われていないときはdiffも取らず、とりあえず出力だけして切り上げる
     if !enable_typeset || param.async_diff {
-        if param.async_diff {
+        if enable_typeset && param.async_diff {
             // asyncでdiffを取るやつは「diff-onlyな自分を無責任に呼ぶ」とする。
             Command::new("latexmk-diff-head").arg("--diff-only").args(std::env::args_os().skip(1)).spawn()?;
         }

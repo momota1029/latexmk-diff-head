@@ -144,7 +144,7 @@ latexmk-diff-head --synctex --flatten paper/main
 このときの出力ファイルは
 - `paper/main.pdf`：通常版PDF
 - `paper/diff/main-diff.pdf`：差分版PDF（追加部分が青、削除部分が赤で表示）
-です。お好みで以下のオプションを指定するとよいでしょう。
+です。お好みで以下のオプションを指定するとよいでしょう。速い方がいいなら`--async-diff`もオススメです。
 
 ## オプション一覧
 全てのオプションを見たければ`latexmk-diff-head -h`とコマンドを打てば(英語ですが)説明が出てきます。
@@ -152,6 +152,7 @@ latexmk-diff-head --synctex --flatten paper/main
 ### 独自オプション
 
 ```bash
+--async-diff       # 差分タイプセット時のエラーを表示しない代わりに、完全非同期で生成(LaTeX Workshopが差分を待たないでいいので気持ち速く感じる)
 --tmpdir DIR       # 一時ファイル用ディレクトリ [default: <doc_dir>/.temp]
 --outdir DIR       # PDF出力ディレクトリ [default: 文書と同じディレクトリ]
 --diff-name DIR    # 差分ディレクトリ名 [default: "diff"]

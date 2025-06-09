@@ -83,6 +83,7 @@ Run `latexmk-diff-head -h` for complete option list. Key options:
 --bibtex           # Use BibTeX
 --biber            # Use Biber (BibLaTeX)
 --revision REV     # Compare against specific revision [default: HEAD]
+--async-diff       # Run diff compilation asynchronously, ignoring its errors
 --tmpdir DIR       # Temporary files directory
 --outdir DIR       # PDF output directory
 ```
