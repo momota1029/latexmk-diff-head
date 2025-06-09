@@ -51,7 +51,7 @@ fn main() -> io::Result<()> {
     if !enable_typeset || param.async_diff {
         if enable_typeset && param.async_diff {
             // asyncでdiffを取るやつは「diff-onlyな自分を無責任に呼ぶ」とする。
-            Command::new("latexmk-diff-head").arg("--diff-only").args(std::env::args_os().skip(1)).spawn()?;
+            Command::new(std::env::current_exe()?).arg("--diff-only").args(std::env::args_os().skip(1)).spawn()?;
         }
         std::io::copy(&mut latexmk_stdout, &mut stdio)?;
         let mk_status = latexmk_spawn.wait()?;
