@@ -128,10 +128,6 @@ pub struct LatexdiffOpts {
     #[arg(long = "enforce-auto-mbox", action)]
     pub enforce_auto_mbox: bool,
 
-    /// verbose モード
-    #[arg(short = 'V', long = "verbose", action)]
-    pub verbose: bool,
-
     /// driver タイプ指定
     #[arg(long = "driver", value_name = "type")]
     pub driver: Option<String>,
@@ -151,15 +147,11 @@ pub struct LatexdiffOpts {
     /// ラベルを可視化
     #[arg(long = "visible-label", action)]
     pub visible_label: bool,
-
-    /// \\input/\\include を展開
-    #[arg(long = "flatten", action)]
-    pub flatten: bool,
 }
 
 impl LatexdiffOpts {
     /// struct の値を Command に反映する
-    pub fn args_to(&self, cmd: &mut Command) {
+    pub fn args_to(&self, verbose: bool, cmd: &mut Command) {
         if let Some(v) = &self.markup_style {
             cmd.arg(format!("--type={}", v));
         }
@@ -256,7 +248,7 @@ impl LatexdiffOpts {
         if self.enforce_auto_mbox {
             cmd.arg("--enforce-auto-mbox");
         }
-        if self.verbose {
+        if verbose {
             cmd.arg("--verbose");
         }
         if let Some(v) = &self.driver {
@@ -273,9 +265,6 @@ impl LatexdiffOpts {
         }
         if self.visible_label {
             cmd.arg("--visible-label");
-        }
-        if self.flatten {
-            cmd.arg("--flatten");
         }
     }
 }

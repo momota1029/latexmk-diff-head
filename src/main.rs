@@ -97,12 +97,6 @@ struct Opts {
     latexdiff_opts: latexdiff::LatexdiffOpts,
     #[clap(flatten)]
     latexdiffvc_ops: LatexdiffVcOpts,
-    // /// Use --flatten option for latexdiff-vc (handles \input/\include)
-    // #[clap(long)]
-    // flatten: bool,
-    // /// Enable SyncTeX (`<docfile>.synctex.gz` file) generation
-    // #[clap(long)]
-    // synctex: bool,
 }
 impl Opts {
     fn to_param(self) -> io::Result<Param> {
@@ -234,11 +228,11 @@ struct LatexdiffVcOpts {
     #[clap(long, short)]
     revision: Vec<String>,
 
-    /// flatten関連
+    /// Use --flatten option for latexdiff-vc (handles \input/\include)
     #[clap(long, group = "flat")]
     flatten: bool,
-    #[clap(long, group = "flat")] // flattenが指定された時のみ有効
-    flatten_keep_intermediate: bool, // --flatten=keep-intermediate相当
+    #[clap(long, group = "flat")]
+    flatten_keep_intermediate: bool,
 }
 impl LatexdiffVcOpts {
     fn args_to(&self, cmd: &mut Command) {
@@ -318,6 +312,7 @@ impl LaTeXMK<'_> {
         std::fs::create_dir_all(&self.tmpdir)?;
         let mut cmd = Command::new("latexmk");
         self.opts.args_to(&mut cmd);
+        cmd.args([&outdir_arg, &auxdir_arg]);
         cmd.arg(self.dir.join(&self.docfile));
         Ok(cmd)
     }
@@ -336,7 +331,7 @@ impl LaTeXMK<'_> {
 fn diffmk(param: &Param) -> Result<(), CError> {
     let stem_diff = osstr_join(&param.docfile, &param.diff_postfix);
     let mut latexdiff = Command::new("latexdiff-vc");
-    param.latexdiff_opts.args_to(&mut latexdiff);
+    param.latexdiff_opts.args_to(param.latexmk_opts.verbose, &mut latexdiff);
     param.latexdiffvc_opts.args_to(&mut latexdiff);
     latexdiff.args(["-d", &param.diff_dir_name, "--force"]);
 
