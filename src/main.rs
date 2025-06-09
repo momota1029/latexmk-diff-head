@@ -247,7 +247,7 @@ impl LatexdiffVcOpts {
         } else if self.rcs {
             cmd.arg("--rcs");
         }
-        if !self.revision.is_empty() {
+        if self.revision.is_empty() {
             cmd.arg("--revision");
         }
         for rev in &self.revision {
