@@ -140,36 +140,46 @@ impl Opts {
     }
 }
 
-// latexmk用オプション（最小限）
+/// Configuration options for latexmk command
 #[derive(Args, Debug)]
 struct LatexmkOpts {
-    /// LaTeX処理系選択
+    /// Use XeLaTeX as the LaTeX engine
     #[clap(long, group = "engine")]
     xelatex: bool,
+
+    /// Use LuaLaTeX as the LaTeX engine
     #[clap(long, group = "engine")]
     lualatex: bool,
 
-    /// 参考文献処理
+    /// Use BibTeX for bibliography processing
     #[clap(long, group = "bib")]
     bibtex: bool,
+
+    /// Use Biber for bibliography processing
     #[clap(long, group = "bib")]
     biber: bool,
+
+    /// Disable bibliography processing entirely
     #[clap(long, group = "bib")]
     nobibtex: bool,
 
-    /// Enable SyncTeX (`<docfile>.synctex.gz` file) generation
+    /// Enable SyncTeX generation for editor synchronization
     #[clap(long)]
     synctex: bool,
 
-    /// 出力レベル制御（相互排他）
+    /// Suppress all output except errors
     #[clap(long, group = "output")]
     silent: bool,
+
+    /// Reduce output verbosity
     #[clap(long, group = "output")]
     quiet: bool,
+
+    /// Increase output verbosity with detailed information
     #[clap(long, group = "output")]
     verbose: bool,
 
-    /// その他のデバッグ・情報表示
+    /// Display system commands being executed
     #[clap(long)]
     commands: bool,
 }
@@ -209,28 +219,38 @@ impl LatexmkOpts {
     }
 }
 
-// latexdiff-vc用オプション
+/// Configuration options for latexdiff-vc command
 #[derive(Args, Debug)]
 struct LatexdiffVcOpts {
-    /// バージョン管理システム（指定されない場合はgit使用）
+    /// Use Git for version control operations
     #[clap(long, group = "vcs")]
     git: bool,
+
+    /// Use Subversion (SVN) for version control operations
     #[clap(long, group = "vcs")]
     svn: bool,
+
+    /// Use Mercurial (Hg) for version control operations
     #[clap(long, group = "vcs")]
     hg: bool,
+
+    /// Use CVS for version control operations
     #[clap(long, group = "vcs")]
     cvs: bool,
+
+    /// Use RCS for version control operations
     #[clap(long, group = "vcs")]
     rcs: bool,
 
-    /// リビジョン指定（未指定時はHEAD使用）
+    /// Specify revision(s) for comparison [default: HEAD vs working copy]
     #[clap(long, short)]
     revision: Vec<String>,
 
-    /// Use --flatten option for latexdiff-vc (handles \input/\include)
+    /// Flatten document by expanding \input and \include commands
     #[clap(long, group = "flat")]
     flatten: bool,
+
+    /// Flatten document and keep intermediate files for debugging
     #[clap(long, group = "flat")]
     flatten_keep_intermediate: bool,
 }

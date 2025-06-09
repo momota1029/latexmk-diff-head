@@ -1,150 +1,150 @@
 use clap::Args;
 use std::process::Command;
 
-/// latexdiff コマンドラインオプション
+/// Configuration options for latexdiff command
 #[derive(Args, Debug)]
 pub struct LatexdiffOpts {
-    /// \DIFadd/\DIFdel のスタイルを指定
+    /// Markup style for \DIFadd and \DIFdel commands
     #[arg(short = 't', long = "type", value_name = "markupstyle")]
     pub markup_style: Option<String>,
 
-    /// ブロック開始・終了コマンドのスタイル
+    /// Style for block start/end commands
     #[arg(short = 's', long = "subtype", value_name = "markstyle")]
     pub sub_style: Option<String>,
 
-    /// 浮動環境内のマークアップスタイル
+    /// Markup style within floating environments
     #[arg(short = 'f', long = "floattype", value_name = "markstyle")]
     pub float_style: Option<String>,
 
-    /// ファイルの文字エンコーディング
+    /// Character encoding for input files [default: utf8]
     #[arg(short = 'e', long = "encoding", value_name = "enc")]
     pub encoding: Option<String>,
 
-    /// 独自プリアンブルファイル
+    /// Custom preamble file for diff output
     #[arg(short = 'p', long = "preamble", value_name = "file")]
     pub preamble: Option<String>,
 
-    /// 使用パッケージ一覧 (カンマ区切り)
+    /// Comma-separated list of required packages
     #[arg(long = "packages", value_name = "pkg1,pkg2,...")]
     pub packages: Option<String>,
 
-    /// プリアンブル表示
+    /// Display the preamble being used
     #[arg(long = "show-preamble", action)]
     pub show_preamble: bool,
 
-    /// 安全コマンドから除外 (正規表現)
+    /// Exclude commands from safe command list (regex pattern)
     #[arg(short = 'A', long = "exclude-safecmd", value_name = "pattern")]
     pub exclude_safe_cmd: Option<String>,
 
-    /// 安全コマンドに追加
+    /// Add commands to safe command list (regex pattern)
     #[arg(short = 'a', long = "append-safecmd", value_name = "pattern")]
     pub append_safe_cmd: Option<String>,
 
-    /// 安全コマンドを置換
+    /// Replace safe command list entirely (regex pattern)
     #[arg(long = "replace-safecmd", value_name = "pattern")]
     pub replace_safe_cmd: Option<String>,
 
-    /// テキストコマンドから除外
+    /// Exclude commands from text command list (regex pattern)
     #[arg(short = 'X', long = "exclude-textcmd", value_name = "pattern")]
     pub exclude_text_cmd: Option<String>,
 
-    /// テキストコマンドに追加
+    /// Add commands to text command list (regex pattern)
     #[arg(short = 'x', long = "append-textcmd", value_name = "pattern")]
     pub append_text_cmd: Option<String>,
 
-    /// テキストコマンドを置換
+    /// Replace text command list entirely (regex pattern)
     #[arg(long = "replace-textcmd", value_name = "pattern")]
     pub replace_text_cmd: Option<String>,
 
-    /// 文脈依存テキストコマンドに追加
+    /// Add commands to context1 command list (regex pattern)
     #[arg(long = "append-context1cmd", value_name = "pattern")]
     pub append_context1_cmd: Option<String>,
 
-    /// 文脈依存テキストコマンドを置換
+    /// Replace context1 command list entirely (regex pattern)
     #[arg(long = "replace-context1cmd", value_name = "pattern")]
     pub replace_context1_cmd: Option<String>,
 
-    /// 文脈2依存テキストコマンドに追加
+    /// Add commands to context2 command list (regex pattern)
     #[arg(long = "append-context2cmd", value_name = "pattern")]
     pub append_context2_cmd: Option<String>,
 
-    /// 文脈2依存テキストコマンドを置換
+    /// Replace context2 command list entirely (regex pattern)
     #[arg(long = "replace-context2cmd", value_name = "pattern")]
     pub replace_context2_cmd: Option<String>,
 
-    /// mbox 保護対象コマンドから除外
+    /// Exclude commands from mbox-safe command list (regex pattern)
     #[arg(long = "exclude-mboxsafecmd", value_name = "pattern")]
     pub exclude_mbox_safe_cmd: Option<String>,
 
-    /// mbox 保護対象コマンドに追加
+    /// Add commands to mbox-safe command list (regex pattern)
     #[arg(long = "append-mboxsafecmd", value_name = "pattern")]
     pub append_mbox_safe_cmd: Option<String>,
 
-    /// 設定変数一括設定 (var=val,...)
+    /// Set configuration variables (var=val,var2=val2,...)
     #[arg(short = 'c', long = "config", value_name = "var1=val1,...")]
     pub config: Option<String>,
 
-    /// 正規表現変数に追加
+    /// Add patterns to regex variables (var=pattern1;pattern2;...)
     #[arg(long = "add-to-config", value_name = "var=pattern1;...")]
     pub add_to_config: Option<String>,
 
-    /// 安全コマンドリストを表示
+    /// Display current safe command list
     #[arg(long = "show-safecmd", action)]
     pub show_safe_cmd: bool,
 
-    /// テキストコマンドリストを表示
+    /// Display current text command list
     #[arg(long = "show-textcmd", action)]
     pub show_text_cmd: bool,
 
-    /// 設定変数を表示
+    /// Display all configuration variables
     #[arg(long = "show-config", action)]
     pub show_config: bool,
 
-    /// すべての表示オプションをまとめて実行
+    /// Execute all --show-* options together
     #[arg(long = "show-all", action)]
     pub show_all: bool,
 
-    /// 数式差分の粒度
+    /// Math markup granularity level (off, whole, coarse, fine)
     #[arg(long = "math-markup", value_name = "level")]
     pub math_markup: Option<String>,
 
-    /// グラフィックス差分の方法
+    /// Graphics markup handling mode (off, new-only, both)
     #[arg(long = "graphics-markup", value_name = "mode")]
     pub graphics_markup: Option<String>,
 
-    /// 引用マークアップ無効化
+    /// Disable citation markup processing
     #[arg(long = "disable-citation-markup", action)]
     pub disable_citation_markup: bool,
 
-    /// auto-mbox 無効化
+    /// Disable automatic mbox protection
     #[arg(long = "disable-auto-mbox", action)]
     pub disable_auto_mbox: bool,
 
-    /// 引用マークアップ有効化
+    /// Enable citation markup processing
     #[arg(long = "enable-citation-markup", action)]
     pub enable_citation_markup: bool,
 
-    /// auto-mbox 強制化
+    /// Force automatic mbox protection
     #[arg(long = "enforce-auto-mbox", action)]
     pub enforce_auto_mbox: bool,
 
-    /// driver タイプ指定
+    /// Specify driver type for output format
     #[arg(long = "driver", value_name = "type")]
     pub driver: Option<String>,
 
-    /// 警告抑制
+    /// Suppress warning messages
     #[arg(long = "ignore-warnings", action)]
     pub ignore_warnings: bool,
 
-    /// 差分ファイルのラベル設定
+    /// Set label for diff output identification
     #[arg(short = 'L', long = "label", value_name = "label")]
     pub label: Option<String>,
 
-    /// ラベル行を抑制
+    /// Suppress label line in diff output
     #[arg(long = "no-label", action)]
     pub no_label: bool,
 
-    /// ラベルを可視化
+    /// Make labels visible in the output
     #[arg(long = "visible-label", action)]
     pub visible_label: bool,
 }
