@@ -2,6 +2,8 @@
 
 A latexmk wrapper that automatically generates diff PDFs against the previous Git commit alongside regular compilation. Designed for LaTeX Workshop integration.
 
+[日本語のREADMEはこちら](README_JA.md)
+
 ## What it does
 
 1. Compiles your LaTeX document normally with latexmk
