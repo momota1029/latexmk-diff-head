@@ -97,5 +97,4 @@ git commit -m "Initial draft"
 After making changes and building, you'll see diffs against this commit. Commit periodically to update the comparison baseline.
 
 ## License
-
-MIT or Apache-2.0 (TBD)
+MIT

@@ -213,8 +213,7 @@ latexmk-diff-head --synctex --flatten paper/main
 - または`--xelatex`/`--lualatex`オプションの使用も検討してみてください
 
 ## ライセンス
-
-MIT または Apache-2.0（検討中）
+MIT
 
 ## 貢献
 

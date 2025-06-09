@@ -2,6 +2,14 @@
 name = "latexmk-diff-head"
 version = "0.1.0"
 edition = "2024"
+description = "LaTeX compilation tool that generates diff PDFs against Git commits"
+homepage = "https://momota.pw"
+repository = "https://github.com/momota1029/latexmk-diff-head"
+license = "MIT"
+authors = ["Conashimi Momota <momota.ry2@gmail.com>"]
+keywords = ["latex", "git", "diff", "academic", "typesetting"]
+categories = ["command-line-utilities", "text-processing"]
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }
