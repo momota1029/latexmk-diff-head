@@ -15,6 +15,20 @@ const ALL_TARGETS_PAT: &[u8] = b"Latexmk: All targets ";
 
 fn main() -> io::Result<()> {
     let param = Opts::parse().to_param()?;
+    if param.diff_only {
+        return match diffmk(&param) {
+            Ok(()) => Ok(()),
+            Err(CError::Io(err)) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+            Err(CError::Main(err)) => {
+                io::stderr().write_all(&err)?;
+                std::process::exit(1);
+            }
+        };
+    }
+
     let latexmk = param.to_latexmk();
     // 普通のlatexmk
     let mut latexmk_spawn = latexmk.command()?.stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;
@@ -34,7 +48,11 @@ fn main() -> io::Result<()> {
         })
     })?;
     // タイプセットが行われていないときはdiffも取らず、とりあえず出力だけして切り上げる
-    if !enable_typeset {
+    if !enable_typeset || param.async_diff {
+        if param.async_diff {
+            // asyncでdiffを取るやつは「diff-onlyな自分を無責任に呼ぶ」とする。
+            Command::new("latexmk").arg("--diff-only").args(std::env::args_os().skip(1)).spawn()?;
+        }
         std::io::copy(&mut latexmk_stdout, &mut stdio)?;
         let mk_status = latexmk_spawn.wait()?;
         if mk_status.success() {
@@ -83,6 +101,14 @@ struct Opts {
     /// Output directory for final PDF [default: same as document directory]
     #[clap(long, short, value_parser)]
     outdir: Option<PathBuf>,
+
+    /// Only generate diff output
+    #[clap(long, value_parser, hide = true)]
+    diff_only: bool,
+
+    /// Use async latexdiff-vc to generate diff
+    #[clap(long, value_parser)]
+    async_diff: bool,
 
     /// Name of subdirectory for diff output [default: "diff"]
     #[clap(long, short, value_parser)]
@@ -133,6 +159,8 @@ impl Opts {
             outdir,
             diff_dir_name,
             diff_postfix,
+            async_diff: self.async_diff,
+            diff_only: self.diff_only,
             latexmk_opts: self.latexmk_opts,
             latexdiff_opts: self.latexdiff_opts,
             latexdiffvc_opts: self.latexdiffvc_ops,
@@ -300,6 +328,9 @@ struct Param {
 
     tmpdir: PathBuf, // ユーザが指定する。latexmkが.auxファイル類を置いておく`--outdir`。ただし下のoutdirと区別するためにおいてある。
     outdir: PathBuf, // latexmkが2024年にout2dir(pdfを出力するディレクトリ)を用意しだしたらしいけど、どうしようもないのでこっちで代替するためのもの
+
+    async_diff: bool,
+    diff_only: bool,
 
     diff_dir_name: String,
     diff_postfix: String,

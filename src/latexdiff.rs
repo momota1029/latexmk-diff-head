@@ -2,7 +2,7 @@ use clap::Args;
 use std::process::Command;
 
 /// Configuration options for latexdiff command
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct LatexdiffOpts {
     /// Markup style for \DIFadd and \DIFdel commands
     #[arg(short = 't', long = "type", value_name = "markupstyle")]
