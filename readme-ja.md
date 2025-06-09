@@ -147,6 +147,7 @@ latexmk-diff-head --synctex --flatten paper/main
 です。お好みで以下のオプションを指定するとよいでしょう。
 
 ## オプション一覧
+全てのオプションを見たければ`latexmk-diff-head -h`とコマンドを打てば(英語ですが)説明が出てきます。
 
 ### 独自オプション
 
