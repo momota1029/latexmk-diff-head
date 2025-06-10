@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    io,
+    io::{self, Write as _},
     path::{Path, PathBuf},
 };
 
@@ -37,6 +37,40 @@ pub fn canonicalize(path: impl AsRef<Path>) -> Result<PathBuf> {
 
 impl Error {
     pub fn print_and_exit<T>(self) -> T {
-        todo!()
+        match self {
+            Error::AlreadySaid => {
+                // Already printed, nothing to do
+            }
+            Error::StdErr(stderr) => {
+                if let Err(e) = std::io::stderr().write_all(&stderr) {
+                    eprintln!("Failed to write error output to stderr: {}", e);
+                }
+            }
+            Error::CurrentDirFailed(e) => {
+                eprintln!("Failed to get current directory: {}", e);
+            }
+            Error::CreateDirFailed { path, source } => {
+                eprintln!("Failed to create directory {}: {}", path.display(), source);
+            }
+            Error::CanonicalizeFailed { path, source } => {
+                eprintln!("Failed to canonicalize path {}: {}", path.display(), source);
+            }
+            Error::FileCopyFailed { from, to, source } => {
+                eprintln!("Failed to copy file {} -> {}: {}", from.display(), to.display(), source);
+            }
+            Error::FileRenameFailed { from, to, source } => {
+                eprintln!("Failed to rename file {} -> {}: {}", from.display(), to.display(), source);
+            }
+            Error::StdIoError(e) => {
+                eprintln!("I/O error occurred: {}", e);
+            }
+            Error::CommandFailed(e) => {
+                eprintln!("Command execution failed: {}", e);
+            }
+            Error::EnvError(e) => {
+                eprintln!("Failed to get environment information: {}", e);
+            }
+        }
+        std::process::exit(1);
     }
 }

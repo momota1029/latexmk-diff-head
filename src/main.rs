@@ -3,6 +3,7 @@ pub mod error;
 pub mod param;
 
 use crate::{
+    cmd::latexmk::LaTeXMK,
     error::{Error, Result},
     param::{Opts, Param},
 };
@@ -11,22 +12,74 @@ use clap::Parser;
 use std::{
     ffi::{OsStr, OsString},
     io::{BufReader, Write as _},
-    process::{Command, Stdio},
+    process::{Child, ChildStdout, Command, Stdio},
 };
 
 const APPLYING_RULE_PAT: &[u8] = b"Latexmk: applying rule ";
 const ALL_TARGETS_PAT: &[u8] = b"Latexmk: All targets ";
 
-fn main() -> error::Result<()> {
+fn main() {
+    std::process::exit(main2().unwrap_or_else(Error::print_and_exit).unwrap_or(1))
+}
+
+fn main2() -> error::Result<Option<i32>> {
     let param = Param::try_from(Opts::parse())?;
     if param.diff_only {
         diffmk(&param)?;
     }
-    let latexmk = param.latexmk();
-    // 普通のlatexmk
+    let latexmk = param.latexmk(); // 普通のlatexmk
+    let (enable_typeset, mut latexmk_out, mut latexmk_spawn) = latexmk_and_sure_typeset(&latexmk)?;
+    let mut stdout = std::io::stdout();
+
+    // タイプセットが行われ、同期的にdiffを取る必要がある場合
+    if enable_typeset && !param.async_diff {
+        // そうでない場合、別スレッドで標準出力だけ横流しする。エラーの出ようがないので無視。
+        let _ = std::thread::spawn(move || std::io::copy(&mut latexmk_out, &mut stdout));
+        let diff_res = diffmk(&param); // latexdiff-vcからタイプセットまでを実行する
+        // diffmkは`*_diff`について作業(`*_diff.aux`などを生成)し、`mk`は`*`について作業する(`*.aux`などを生成する)ため、生成ファイルやその処理が全く被らないことに注意(関係ないファイルを上書きすることはあるが、実行時のエラーになるわけではない)
+
+        // メインのlatexmkが成功しなかったらその場で失敗する
+        let mk_status = latexmk_spawn.wait().map_err(error::Error::CommandFailed)?;
+        if !mk_status.success() {
+            Err(Error::AlreadySaid)?;
+        }
+        latexmk.rename_pdf()?;
+        diff_res?;
+        return Ok(mk_status.code());
+    }
+
+    // 非同期でdiffを取る場合の対応
+    if param.async_diff {
+        // asyncでdiffを取るやつは「diff-onlyな自分を無責任に呼ぶ」とする。
+        Command::new(std::env::current_exe().map_err(Error::EnvError)?)
+            .arg("--diff-only")
+            .args(std::env::args_os().skip(1))
+            .spawn()
+            .map_err(error::Error::CommandFailed)?;
+    }
+
+    // 出力を素通りさせる
+    std::io::copy(&mut latexmk_out, &mut stdout).map_err(error::Error::StdIoError)?;
+    let mk_status = latexmk_spawn.wait().map_err(error::Error::CommandFailed)?;
+    if !mk_status.success() {
+        Err(Error::AlreadySaid)?;
+    }
+    latexmk.rename_pdf()?;
+    if param.latexmk_opts.synctex {
+        // この場合LaTeX WorkshopがSyncTeX位置反映を怠るので、擬似的に出力があったということにしておく
+        println!("Output written on dummy.pdf (for LaTeX Workshop's SyncTeX refresh on {:?}).", param.docfile);
+    }
+    return Ok(mk_status.code());
+}
+
+fn osstr_join(path: impl AsRef<OsStr>, ext: &str) -> OsString {
+    OsString::from_iter([path.as_ref(), OsStr::new(ext)])
+}
+
+fn latexmk_and_sure_typeset(latexmk: &LaTeXMK) -> Result<(bool, ChildStdout, Child)> {
     let mut latexmk_spawn =
         latexmk.command()?.stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn().map_err(error::Error::CommandFailed)?;
-    let Some(mut latexmk_stdout) = latexmk_spawn.stdout.take() else { return Ok(()) }; // 出力がないってことは無いだろ……
+    let mut latexmk_stdout = latexmk_spawn.stdout.take().expect("handle present"); // 出力がないってことは無いだろ……
     let mut stdio = std::io::stdout();
     let mut enable_typeset = false;
     // typesetが行われたかどうかを判定しながら出力を素通りさせる
@@ -41,46 +94,7 @@ fn main() -> error::Result<()> {
             })
         })
         .map_err(error::Error::StdIoError)?;
-    // タイプセットが行われていないときはdiffも取らず、とりあえず出力だけして切り上げる
-    if !enable_typeset || param.async_diff {
-        if enable_typeset && param.async_diff {
-            // asyncでdiffを取るやつは「diff-onlyな自分を無責任に呼ぶ」とする。
-            Command::new(std::env::current_exe().map_err(Error::EnvError)?)
-                .arg("--diff-only")
-                .args(std::env::args_os().skip(1))
-                .spawn()
-                .map_err(error::Error::CommandFailed)?;
-        }
-        std::io::copy(&mut latexmk_stdout, &mut stdio).map_err(error::Error::StdIoError)?;
-        let mk_status = latexmk_spawn.wait().map_err(error::Error::CommandFailed)?;
-        if mk_status.success() {
-            latexmk.rename_pdf()?;
-        }
-        if param.latexmk_opts.synctex {
-            // この場合LaTeX WorkshopがSyncTeX位置反映を怠るので、擬似的に出力があったということにしておく
-            println!("Output written on dummy.pdf (for LaTeX Workshop's SyncTeX refresh on {:?}).", param.docfile);
-        }
-        std::process::exit(mk_status.code().unwrap_or(1));
-    }
-
-    // そうでない場合、別スレッドで標準出力だけ横流しする。エラーの出ようがないので無視。
-    let _ = std::thread::spawn(move || std::io::copy(&mut latexmk_stdout, &mut stdio));
-    let diff_res = diffmk(&param); // latexdiff-vcからタイプセットまでを実行する
-    // diffmkは`*_diff`について作業(`*_diff.aux`などを生成)し、`mk`は`*`について作業する(`*.aux`などを生成する)ため、生成ファイルやその処理が全く被らないことに注意(関係ないファイルを上書きすることはあるが、実行時のエラーになるわけではない)
-
-    // メインのlatexmkが成功しなかったらその場で失敗する
-    let mk_status = latexmk_spawn.wait().map_err(error::Error::CommandFailed)?;
-    if !mk_status.success() {
-        std::process::exit(mk_status.code().unwrap_or(1));
-    }
-    // そうでなければpdfを移動
-    latexmk.rename_pdf()?;
-    diff_res?;
-    std::process::exit(mk_status.code().unwrap_or(1));
-}
-
-fn osstr_join(path: impl AsRef<OsStr>, ext: &str) -> OsString {
-    OsString::from_iter([path.as_ref(), OsStr::new(ext)])
+    Ok((enable_typeset, latexmk_stdout, latexmk_spawn))
 }
 
 fn diffmk(param: &Param) -> error::Result<()> {
