@@ -25,7 +25,7 @@ fn main() {
 fn main2() -> error::Result<Option<i32>> {
     let param = Param::try_from(Opts::parse())?;
     if param.diff_only {
-        diffmk(&param)?;
+        return diffmk(&param);
     }
     let latexmk = param.latexmk(); // 普通のlatexmk
     let (enable_typeset, mut latexmk_out, mut latexmk_spawn) = latexmk_and_sure_typeset(&latexmk)?;
@@ -69,7 +69,7 @@ fn main2() -> error::Result<Option<i32>> {
         // この場合LaTeX WorkshopがSyncTeX位置反映を怠るので、擬似的に出力があったということにしておく
         println!("Output written on dummy.pdf (for LaTeX Workshop's SyncTeX refresh on {:?}).", param.docfile);
     }
-    return Ok(mk_status.code());
+    Ok(mk_status.code())
 }
 
 fn osstr_join(path: impl AsRef<OsStr>, ext: &str) -> OsString {
@@ -97,31 +97,35 @@ fn latexmk_and_sure_typeset(latexmk: &LaTeXMK) -> Result<(bool, ChildStdout, Chi
     Ok((enable_typeset, latexmk_stdout, latexmk_spawn))
 }
 
-fn diffmk(param: &Param) -> error::Result<()> {
+fn diffmk(param: &Param) -> error::Result<Option<i32>> {
     // doc.texであればdoc_diff.texとかになる。
     let latexdiff_vc = param.latexdiff_vc();
-    cmd_for_diff(latexdiff_vc.command(), param.diff_only)?;
+    let latexdiff_vc_code = cmd_for_diff(latexdiff_vc.command(), param.diff_only)?;
     latexdiff_vc.rename_tex()?;
+    if latexdiff_vc_code != Some(0) {
+        return Ok(latexdiff_vc_code);
+    }
 
     // ここでは一時的にparam.dir.join(DIFF_DIR_NAME)をちゃんと作成してそれを参照しているコードとして解釈されており、問題はない
     // 実際にダングリング参照になる場合はRustコンパイラが警告を出すが、今回はそうなっていない
     let latexmk = param.latexmk_for_diff();
-    cmd_for_diff(latexmk.command()?, param.diff_only)?;
+    let latexmk_code = cmd_for_diff(latexmk.command()?, param.diff_only)?;
     latexmk.rename_pdf()?;
-    Ok(())
+    Ok(latexmk_code)
 }
 
-fn cmd_for_diff(mut cmd: Command, diff_only: bool) -> Result<()> {
+fn cmd_for_diff(mut cmd: Command, diff_only: bool) -> Result<Option<i32>> {
     if diff_only {
         let output = cmd.output().map_err(Error::CommandFailed)?;
         if !output.status.success() {
             return Err(Error::AlreadySaid);
         }
+        Ok(output.status.code())
     } else {
         let output = cmd.stdout(Stdio::null()).stderr(Stdio::piped()).output().map_err(Error::CommandFailed)?;
         if !output.status.success() {
             return Err(Error::StdErr(output.stderr));
         }
+        Ok(output.status.code())
     }
-    Ok(())
 }
