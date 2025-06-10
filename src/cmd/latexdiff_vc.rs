@@ -81,6 +81,10 @@ pub struct Opts {
     /// Use latexdiff-so
     #[clap(long, group = "execution")]
     so: bool,
+
+    /// Only show pages with changes
+    #[clap(long)]
+    only_changes: bool,
 }
 impl Opts {
     pub fn args_to(&self, cmd: &mut Command) {
@@ -111,6 +115,9 @@ impl Opts {
         }
         if self.so {
             cmd.arg("--so");
+        }
+        if self.only_changes {
+            cmd.arg("--only-changes");
         }
     }
 }
