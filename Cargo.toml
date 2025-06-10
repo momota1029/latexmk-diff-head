@@ -1,6 +1,6 @@
 [package]
 name = "latexmk-diff-head"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 description = "LaTeX compilation tool that generates diff PDFs against Git commits"
 homepage = "https://momota.pw"
