@@ -3,7 +3,7 @@ use std::process::Command;
 
 /// Configuration options for latexdiff command
 #[derive(Args, Debug, Clone)]
-pub struct LatexdiffOpts {
+pub struct Opts {
     /// Markup style for \DIFadd and \DIFdel commands
     #[arg(short = 't', long = "type", value_name = "markupstyle")]
     pub markup_style: Option<String>,
@@ -149,7 +149,7 @@ pub struct LatexdiffOpts {
     pub visible_label: bool,
 }
 
-impl LatexdiffOpts {
+impl Opts {
     /// struct の値を Command に反映する
     pub fn args_to(&self, verbose: bool, cmd: &mut Command) {
         if let Some(v) = &self.markup_style {

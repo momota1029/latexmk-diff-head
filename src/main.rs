@@ -1,7 +1,7 @@
-mod latexdiff;
+mod cmd;
 
 use bstr::io::BufReadExt as _;
-use clap::{Args, Parser};
+use clap::Parser;
 use std::{
     ffi::{OsStr, OsString},
     io::{self, BufReader, Write as _},
@@ -9,6 +9,11 @@ use std::{
     process::{Command, Stdio},
 };
 use thiserror::Error;
+
+use crate::cmd::{
+    latexdiff, latexdiff_vc,
+    latexmk::{self, LaTeXMK},
+};
 
 const APPLYING_RULE_PAT: &[u8] = b"Latexmk: applying rule ";
 const ALL_TARGETS_PAT: &[u8] = b"Latexmk: All targets ";
@@ -128,11 +133,11 @@ struct Opts {
     diff_postfix: Option<String>,
 
     #[clap(flatten)]
-    latexmk_opts: LatexmkOpts,
+    latexmk_opts: latexmk::Opts,
     #[clap(flatten)]
-    latexdiff_opts: latexdiff::LatexdiffOpts,
+    latexdiff_opts: latexdiff::Opts,
     #[clap(flatten)]
-    latexdiffvc_ops: LatexdiffVcOpts,
+    latexdiffvc_ops: latexdiff_vc::Opts,
 }
 impl Opts {
     fn to_param(self) -> io::Result<Param> {
@@ -180,147 +185,6 @@ impl Opts {
     }
 }
 
-/// Configuration options for latexmk command
-#[derive(Args, Debug)]
-struct LatexmkOpts {
-    /// Use XeLaTeX as the LaTeX engine
-    #[clap(long, group = "engine")]
-    xelatex: bool,
-
-    /// Use LuaLaTeX as the LaTeX engine
-    #[clap(long, group = "engine")]
-    lualatex: bool,
-
-    /// Use BibTeX for bibliography processing
-    #[clap(long, group = "bib")]
-    bibtex: bool,
-
-    /// Use Biber for bibliography processing
-    #[clap(long, group = "bib")]
-    biber: bool,
-
-    /// Disable bibliography processing entirely
-    #[clap(long, group = "bib")]
-    nobibtex: bool,
-
-    /// Enable SyncTeX generation for editor synchronization
-    #[clap(long)]
-    synctex: bool,
-
-    /// Suppress all output except errors
-    #[clap(long, group = "output")]
-    silent: bool,
-
-    /// Reduce output verbosity
-    #[clap(long, group = "output")]
-    quiet: bool,
-
-    /// Increase output verbosity with detailed information
-    #[clap(long, group = "output")]
-    verbose: bool,
-
-    /// Display system commands being executed
-    #[clap(long)]
-    commands: bool,
-}
-impl LatexmkOpts {
-    fn args_to(&self, cmd: &mut Command) {
-        cmd.args(["-halt-on-error", "-file-line-error"]);
-        if self.xelatex {
-            cmd.arg("-xelatex");
-        } else if self.lualatex {
-            cmd.arg("-lualatex");
-        } // 参考文献処理
-        if self.bibtex {
-            cmd.arg("-bibtex");
-        } else if self.biber {
-            cmd.arg("-biber");
-        } else if self.nobibtex {
-            cmd.arg("-nobibtex");
-        }
-
-        // 出力制御
-        if self.silent {
-            cmd.arg("-silent");
-        } else if self.quiet {
-            cmd.arg("-quiet");
-        } else if self.verbose {
-            cmd.arg("-verbose");
-        }
-
-        // その他
-        if self.commands {
-            cmd.arg("-commands");
-        }
-
-        if self.synctex {
-            cmd.arg("-synctex=1");
-        }
-    }
-}
-
-/// Configuration options for latexdiff-vc command
-#[derive(Args, Debug)]
-struct LatexdiffVcOpts {
-    /// Use Git for version control operations
-    #[clap(long, group = "vcs")]
-    git: bool,
-
-    /// Use Subversion (SVN) for version control operations
-    #[clap(long, group = "vcs")]
-    svn: bool,
-
-    /// Use Mercurial (Hg) for version control operations
-    #[clap(long, group = "vcs")]
-    hg: bool,
-
-    /// Use CVS for version control operations
-    #[clap(long, group = "vcs")]
-    cvs: bool,
-
-    /// Use RCS for version control operations
-    #[clap(long, group = "vcs")]
-    rcs: bool,
-
-    /// Specify revision(s) for comparison [default: HEAD vs working copy]
-    #[clap(long, short)]
-    revision: Vec<String>,
-
-    /// Flatten document by expanding \input and \include commands
-    #[clap(long, group = "flat")]
-    flatten: bool,
-
-    /// Flatten document and keep intermediate files for debugging
-    #[clap(long, group = "flat")]
-    flatten_keep_intermediate: bool,
-}
-impl LatexdiffVcOpts {
-    fn args_to(&self, cmd: &mut Command) {
-        if self.git {
-            cmd.arg("--git");
-        } else if self.svn {
-            cmd.arg("--svn");
-        } else if self.hg {
-            cmd.arg("--hg");
-        } else if self.cvs {
-            cmd.arg("--cvs");
-        } else if self.rcs {
-            cmd.arg("--rcs");
-        }
-        if self.revision.is_empty() {
-            cmd.arg("--revision");
-        }
-        for rev in &self.revision {
-            cmd.args(["--revision", rev]);
-        }
-        if self.flatten {
-            cmd.arg("--flatten");
-        } else if self.flatten_keep_intermediate {
-            cmd.arg("--flatten=keep-intermediate");
-        }
-    }
-}
-
 #[derive(Debug, Error)]
 enum CError {
     #[error("{}", String::from_utf8_lossy(.0))]
@@ -329,9 +193,7 @@ enum CError {
     Io(#[from] io::Error),
 }
 fn osstr_join(path: impl AsRef<OsStr>, ext: &str) -> OsString {
-    let mut buf = path.as_ref().to_os_string();
-    buf.push(ext);
-    buf
+    OsString::from_iter([path.as_ref(), OsStr::new(ext)])
 }
 
 struct Param {
@@ -350,11 +212,14 @@ struct Param {
     diff_dir_name: String,
     diff_postfix: String,
 
-    latexdiff_opts: latexdiff::LatexdiffOpts,
-    latexdiffvc_opts: LatexdiffVcOpts,
-    latexmk_opts: LatexmkOpts,
+    latexdiff_opts: latexdiff::Opts,
+    latexdiffvc_opts: latexdiff_vc::Opts,
+    latexmk_opts: latexmk::Opts,
 }
 impl Param {
+    fn name_from_ext(&self, ext: &str) -> OsString {
+        OsString::from_iter([&self.docfile, OsStr::new("."), OsStr::new(ext)])
+    }
     fn to_latexmk(&self) -> LaTeXMK {
         LaTeXMK {
             latexmk: &self.latexmk,
@@ -367,35 +232,6 @@ impl Param {
     }
 }
 
-// dir+docfileとtepmdirを指定してlatexmkを実行し、pdfとsynctexをoutdirに移動する。
-struct LaTeXMK<'a> {
-    latexmk: &'a Path,
-    dir: &'a Path,
-    docfile: &'a OsStr,
-    tmpdir: &'a Path,
-    outdir: &'a Path,
-    opts: &'a LatexmkOpts,
-}
-impl LaTeXMK<'_> {
-    fn command(&self) -> io::Result<Command> {
-        std::fs::create_dir_all(&self.tmpdir)?;
-        let mut cmd = Command::new(self.latexmk);
-        self.opts.args_to(&mut cmd);
-        cmd.args(["-outdir=", "-auxdir="].map(|key| OsString::from_iter([OsStr::new(key), self.tmpdir.as_os_str()])));
-        cmd.arg(self.dir.join(&self.docfile));
-        Ok(cmd)
-    }
-    fn rename_pdf(self) -> io::Result<()> {
-        let tmpdoc = self.tmpdir.join(&self.docfile);
-        let outdoc = self.outdir.join(self.docfile);
-        std::fs::copy(osstr_join(&tmpdoc, ".pdf"), osstr_join(&outdoc, ".pdf"))?;
-        if self.opts.synctex {
-            std::fs::copy(osstr_join(&tmpdoc, ".synctex.gz"), osstr_join(&outdoc, ".synctex.gz"))?;
-        }
-        Ok(())
-    }
-}
-
 fn diffmk(param: &Param) -> Result<(), CError> {
     let stem_diff = osstr_join(&param.docfile, &param.diff_postfix);
     let mut latexdiff = Command::new(&param.latexdiff_vc);
@@ -403,8 +239,8 @@ fn diffmk(param: &Param) -> Result<(), CError> {
     param.latexdiffvc_opts.args_to(&mut latexdiff);
     latexdiff.args(["-d", &param.diff_dir_name, "--force"]);
 
-    latexdiff.arg(osstr_join(&param.docfile, ".tex"));
     // current_dirからの相対指定でないと失敗する(ここではファイル名のみでOK)
+    latexdiff.arg(param.name_from_ext("tex"));
     let start = std::time::Instant::now();
     // current_dirを指定すると、そこにdiffを作成して、渡されたパス文字列をその中に忠実に再現する(すなわち絶対パスは死ぬ)
     let latexdiff_output = latexdiff.current_dir(&param.dir).stdout(Stdio::null()).stderr(Stdio::piped()).output()?;
