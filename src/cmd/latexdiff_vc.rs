@@ -1,11 +1,10 @@
 use std::{
     ffi::{OsStr, OsString},
-    io,
     path::Path,
     process::Command,
 };
 
-use crate::osstr_join;
+use crate::{error, osstr_join};
 
 pub struct LatexdiffVc<'a> {
     pub latexdiff_vc: &'a Path,
@@ -16,25 +15,25 @@ pub struct LatexdiffVc<'a> {
     pub opts: &'a Opts,
     pub latexdiff_opts: &'a super::latexdiff::Opts,
     pub tmpdir: &'a Path,
-    pub stem_diff: &'a OsStr,
+    pub diff_docfile: &'a OsStr,
 }
 impl LatexdiffVc<'_> {
-    pub fn command(&self) -> io::Result<Command> {
+    pub fn command(&self) -> Command {
         let mut latexdiff = Command::new(&self.latexdiff_vc);
         self.latexdiff_opts.args_to(self.verbose, &mut latexdiff);
         self.opts.args_to(&mut latexdiff);
         latexdiff.args(["-d", &self.diff_dir_name, "--force"]);
         // current_dirからの相対指定でないとdiffフォルダに入れるのに失敗する(ここではファイル名のみでOK)
         latexdiff.arg(OsString::from_iter([self.docfile, OsStr::new(".tex")])).current_dir(&self.dir);
-        Ok(latexdiff)
+        latexdiff
     }
-    pub fn rename_tex(self) -> io::Result<()> {
-        std::fs::create_dir_all(&self.tmpdir)?;
-        std::fs::rename(
+    pub fn rename_tex(self) -> error::Result<()> {
+        error::create_dir_all(&self.tmpdir)?;
+        error::rename(
             // DIFF_DIR_NAMEが存在していなかった場合も、latexdiff-vcが自動作成する
             self.dir.join(&self.diff_dir_name).join(osstr_join(&self.docfile, ".tex")),
             // doc.texであればdoc_diff.texとかになる。
-            self.tmpdir.join(osstr_join(&self.stem_diff, ".tex")),
+            self.tmpdir.join(osstr_join(&self.diff_docfile, ".tex")),
         )?; // とりあえずさっさと移動。
         Ok(())
     }

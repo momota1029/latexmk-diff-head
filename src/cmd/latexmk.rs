@@ -1,9 +1,11 @@
 use std::{
+    borrow::Cow,
     ffi::{OsStr, OsString},
-    io,
     path::Path,
     process::Command,
 };
+
+use crate::error;
 
 // dir+docfileとtepmdirを指定してlatexmkを実行し、pdfとsynctexをoutdirに移動する。
 pub struct LaTeXMK<'a> {
@@ -11,24 +13,24 @@ pub struct LaTeXMK<'a> {
     pub dir: &'a Path,
     pub docfile: &'a OsStr,
     pub tmpdir: &'a Path,
-    pub outdir: &'a Path,
+    pub outdir: Cow<'a, Path>,
     pub opts: &'a Opts,
 }
 impl LaTeXMK<'_> {
-    pub fn command(&self) -> io::Result<Command> {
-        std::fs::create_dir_all(&self.tmpdir)?;
+    pub fn command(&self) -> error::Result<Command> {
+        error::create_dir_all(&self.tmpdir)?;
         let mut cmd = Command::new(self.latexmk);
         self.opts.args_to(&mut cmd);
         cmd.args(["-outdir=", "-auxdir="].map(|key| OsString::from_iter([OsStr::new(key), self.tmpdir.as_os_str()])));
         cmd.arg(self.dir.join(&self.docfile));
         Ok(cmd)
     }
-    pub fn rename_pdf(self) -> io::Result<()> {
+    pub fn rename_pdf(self) -> error::Result<()> {
         let pdf_name = OsString::from_iter([self.docfile, OsStr::new(".pdf")]);
         let synctex_name = OsString::from_iter([self.docfile, OsStr::new(".synctex.gz")]);
-        std::fs::copy(self.tmpdir.join(&pdf_name), self.outdir.join(pdf_name))?;
+        error::copy(self.tmpdir.join(&pdf_name), self.outdir.join(pdf_name))?;
         if self.opts.synctex {
-            std::fs::copy(self.tmpdir.join(&synctex_name), self.outdir.join(synctex_name))?;
+            error::copy(self.tmpdir.join(&synctex_name), self.outdir.join(synctex_name))?;
         }
         Ok(())
     }
