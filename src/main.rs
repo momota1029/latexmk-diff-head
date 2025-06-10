@@ -11,7 +11,8 @@ use std::{
 use thiserror::Error;
 
 use crate::cmd::{
-    latexdiff, latexdiff_vc,
+    latexdiff,
+    latexdiff_vc::{self, LatexdiffVc},
     latexmk::{self, LaTeXMK},
 };
 
@@ -34,7 +35,7 @@ fn main() -> io::Result<()> {
         };
     }
 
-    let latexmk = param.to_latexmk();
+    let latexmk = param.latexmk();
     // 普通のlatexmk
     let mut latexmk_spawn = latexmk.command()?.stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;
     let Some(mut latexmk_stdout) = latexmk_spawn.stdout.take() else { return Ok(()) }; // 出力がないってことは無いだろ……
@@ -217,10 +218,7 @@ struct Param {
     latexmk_opts: latexmk::Opts,
 }
 impl Param {
-    fn name_from_ext(&self, ext: &str) -> OsString {
-        OsString::from_iter([&self.docfile, OsStr::new("."), OsStr::new(ext)])
-    }
-    fn to_latexmk(&self) -> LaTeXMK {
+    fn latexmk(&self) -> LaTeXMK {
         LaTeXMK {
             latexmk: &self.latexmk,
             dir: &self.dir,
@@ -230,32 +228,32 @@ impl Param {
             opts: &self.latexmk_opts,
         }
     }
+    fn latexdiff_vc<'a>(&'a self, stem_diff: &'a OsStr) -> LatexdiffVc<'a> {
+        LatexdiffVc {
+            latexdiff_vc: &self.latexdiff_vc,
+            dir: &self.dir,
+            docfile: &self.docfile,
+            diff_dir_name: &self.diff_dir_name,
+            verbose: self.latexmk_opts.verbose,
+            opts: &self.latexdiffvc_opts,
+            latexdiff_opts: &self.latexdiff_opts,
+            tmpdir: &self.tmpdir,
+            stem_diff,
+        }
+    }
 }
 
 fn diffmk(param: &Param) -> Result<(), CError> {
+    // doc.texであればdoc_diff.texとかになる。
     let stem_diff = osstr_join(&param.docfile, &param.diff_postfix);
-    let mut latexdiff = Command::new(&param.latexdiff_vc);
-    param.latexdiff_opts.args_to(param.latexmk_opts.verbose, &mut latexdiff);
-    param.latexdiffvc_opts.args_to(&mut latexdiff);
-    latexdiff.args(["-d", &param.diff_dir_name, "--force"]);
-
-    // current_dirからの相対指定でないと失敗する(ここではファイル名のみでOK)
-    latexdiff.arg(param.name_from_ext("tex"));
+    let latexdiff_vc = param.latexdiff_vc(&stem_diff);
     let start = std::time::Instant::now();
-    // current_dirを指定すると、そこにdiffを作成して、渡されたパス文字列をその中に忠実に再現する(すなわち絶対パスは死ぬ)
-    let latexdiff_output = latexdiff.current_dir(&param.dir).stdout(Stdio::null()).stderr(Stdio::piped()).output()?;
+    let latexdiff_output = latexdiff_vc.command()?.stdout(Stdio::null()).stderr(Stdio::piped()).output()?;
     println!("latexdiff-vc took {} ms", start.elapsed().as_millis());
     if !latexdiff_output.status.success() {
         return Err(CError::Main(latexdiff_output.stderr));
     }
-
-    // doc.texであればdoc_diffとかになる。
-    std::fs::create_dir_all(&param.tmpdir)?;
-    std::fs::rename(
-        // DIFF_DIR_NAMEが存在していなかった場合も、latexdiff-vcが自動作成する
-        param.dir.join(&param.diff_dir_name).join(osstr_join(&param.docfile, ".tex")),
-        param.tmpdir.join(osstr_join(&stem_diff, ".tex")),
-    )?; // とりあえずさっさと移動。
+    latexdiff_vc.rename_tex()?;
 
     // ここでは一時的にparam.dir.join(DIFF_DIR_NAME)をちゃんと作成してそれを参照しているコードとして解釈されており、問題はない
     // 実際にダングリング参照になる場合はRustコンパイラが警告を出すが、今回はそうなっていない
