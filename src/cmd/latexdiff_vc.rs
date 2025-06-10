@@ -73,6 +73,14 @@ pub struct Opts {
     /// Flatten document and keep intermediate files for debugging
     #[clap(long, group = "flat")]
     pub flatten_keep_intermediate: bool,
+
+    /// Use latexdiff-fast
+    #[clap(long, group = "execution")]
+    fast: bool,
+
+    /// Use latexdiff-so
+    #[clap(long, group = "execution")]
+    so: bool,
 }
 impl Opts {
     pub fn args_to(&self, cmd: &mut Command) {
@@ -97,6 +105,12 @@ impl Opts {
             cmd.arg("--flatten");
         } else if self.flatten_keep_intermediate {
             cmd.arg("--flatten=keep-intermediate");
+        }
+        if self.fast {
+            cmd.arg("--fast");
+        }
+        if self.so {
+            cmd.arg("--so");
         }
     }
 }
