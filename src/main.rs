@@ -58,8 +58,10 @@ fn main() -> io::Result<()> {
         if mk_status.success() {
             latexmk.rename_pdf()?;
         }
-        // この場合LaTeX WorkshopがSyncTeX位置反映を怠るので、擬似的に出力があったということにしておく
-        println!("Output written on dummy.pdf (for LaTeX Workshop's SyncTeX refresh on {:?}).", param.docfile);
+        if param.latexmk_opts.synctex {
+            // この場合LaTeX WorkshopがSyncTeX位置反映を怠るので、擬似的に出力があったということにしておく
+            println!("Output written on dummy.pdf (for LaTeX Workshop's SyncTeX refresh on {:?}).", param.docfile);
+        }
         std::process::exit(mk_status.code().unwrap_or(1));
     }
 
@@ -101,6 +103,14 @@ struct Opts {
     /// Output directory for final PDF [default: same as document directory]
     #[clap(long, short, value_parser)]
     outdir: Option<PathBuf>,
+
+    /// Path to latexmk executable [default: "latexmk"]
+    #[clap(long, value_parser)]
+    latexmk: Option<PathBuf>,
+
+    /// Path to latexdiff-vc executable [default: "latexdiff-vc"]
+    #[clap(long, value_parser)]
+    latexdiff_vc: Option<PathBuf>,
 
     /// Only generate diff output
     #[clap(long, value_parser, hide = true)]
@@ -159,6 +169,8 @@ impl Opts {
             outdir,
             diff_dir_name,
             diff_postfix,
+            latexmk: self.latexmk.unwrap_or_else(|| "latexmk".into()),
+            latexdiff_vc: self.latexdiff_vc.unwrap_or_else(|| "latexdiff-vc".into()),
             async_diff: self.async_diff,
             diff_only: self.diff_only,
             latexmk_opts: self.latexmk_opts,
@@ -332,6 +344,9 @@ struct Param {
     async_diff: bool,
     diff_only: bool,
 
+    latexmk: PathBuf,
+    latexdiff_vc: PathBuf,
+
     diff_dir_name: String,
     diff_postfix: String,
 
@@ -355,23 +370,17 @@ struct LaTeXMK<'a> {
 }
 impl LaTeXMK<'_> {
     fn command(&self) -> io::Result<Command> {
-        let mut outdir_arg = OsString::from("-outdir=");
-        outdir_arg.push(&self.tmpdir);
-        let mut auxdir_arg = OsString::from("-auxdir=");
-        auxdir_arg.push(&self.tmpdir);
-
         std::fs::create_dir_all(&self.tmpdir)?;
         let mut cmd = Command::new("latexmk");
         self.opts.args_to(&mut cmd);
-        cmd.args([&outdir_arg, &auxdir_arg]);
+        cmd.args(["-outdir=", "-auxdir="].map(|key| OsString::from_iter([OsStr::new(key), self.tmpdir.as_os_str()])));
         cmd.arg(self.dir.join(&self.docfile));
         Ok(cmd)
     }
     fn rename_pdf(self) -> io::Result<()> {
         let tmpdoc = self.tmpdir.join(&self.docfile);
         let outdoc = self.outdir.join(self.docfile);
-        let pdf = PathBuf::from(osstr_join(&outdoc, ".pdf"));
-        std::fs::copy(osstr_join(&tmpdoc, ".pdf"), &pdf)?;
+        std::fs::copy(osstr_join(&tmpdoc, ".pdf"), osstr_join(&outdoc, ".pdf"))?;
         if self.opts.synctex {
             std::fs::copy(osstr_join(&tmpdoc, ".synctex.gz"), osstr_join(&outdoc, ".synctex.gz"))?;
         }
