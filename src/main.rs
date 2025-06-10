@@ -356,12 +356,20 @@ struct Param {
 }
 impl Param {
     fn to_latexmk(&self) -> LaTeXMK {
-        LaTeXMK { dir: &self.dir, docfile: &self.docfile, tmpdir: &self.tmpdir, outdir: &self.outdir, opts: &self.latexmk_opts }
+        LaTeXMK {
+            latexmk: &self.latexmk,
+            dir: &self.dir,
+            docfile: &self.docfile,
+            tmpdir: &self.tmpdir,
+            outdir: &self.outdir,
+            opts: &self.latexmk_opts,
+        }
     }
 }
 
 // dir+docfileとtepmdirを指定してlatexmkを実行し、pdfとsynctexをoutdirに移動する。
 struct LaTeXMK<'a> {
+    latexmk: &'a Path,
     dir: &'a Path,
     docfile: &'a OsStr,
     tmpdir: &'a Path,
@@ -371,7 +379,7 @@ struct LaTeXMK<'a> {
 impl LaTeXMK<'_> {
     fn command(&self) -> io::Result<Command> {
         std::fs::create_dir_all(&self.tmpdir)?;
-        let mut cmd = Command::new("latexmk");
+        let mut cmd = Command::new(self.latexmk);
         self.opts.args_to(&mut cmd);
         cmd.args(["-outdir=", "-auxdir="].map(|key| OsString::from_iter([OsStr::new(key), self.tmpdir.as_os_str()])));
         cmd.arg(self.dir.join(&self.docfile));
@@ -390,7 +398,7 @@ impl LaTeXMK<'_> {
 
 fn diffmk(param: &Param) -> Result<(), CError> {
     let stem_diff = osstr_join(&param.docfile, &param.diff_postfix);
-    let mut latexdiff = Command::new("latexdiff-vc");
+    let mut latexdiff = Command::new(&param.latexdiff_vc);
     param.latexdiff_opts.args_to(param.latexmk_opts.verbose, &mut latexdiff);
     param.latexdiffvc_opts.args_to(&mut latexdiff);
     latexdiff.args(["-d", &param.diff_dir_name, "--force"]);
@@ -416,6 +424,7 @@ fn diffmk(param: &Param) -> Result<(), CError> {
     // ここでは一時的にparam.dir.join(DIFF_DIR_NAME)をちゃんと作成してそれを参照しているコードとして解釈されており、問題はない
     // 実際にダングリング参照になる場合はRustコンパイラが警告を出すが、今回はそうなっていない
     let latexmk = LaTeXMK {
+        latexmk: &param.latexmk,
         dir: &param.tmpdir,
         docfile: &stem_diff,
         tmpdir: &param.tmpdir,
